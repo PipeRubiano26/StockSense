@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% from "_macros.html" import field %}
+{% set editing = supplier is not none %}
+{% block title %}{{ 'Editar proveedor' if editing else 'Nuevo proveedor' }}{% endblock %}
+{% block page_title %}{{ 'Editar: ' ~ supplier.name if editing else 'Registrar proveedor' }}{% endblock %}
+{% block page_subtitle %}Todos los campos son obligatorios{% endblock %}
+
+{% block content %}
+{% if errors %}<div class="alert alert-danger">Revise los campos marcados en rojo.</div>{% endif %}
+<div class="row"><div class="col-12 col-xl-8">
+<form method="post" class="ss-card" novalidate>
+  <div class="ss-card-body row g-0 gx-4">
+    <div class="col-12 col-md-6">
+      {{ field('name', 'Nombre *', values, errors, attrs='maxlength="120" required') }}
+      {{ field('contact', 'Persona de contacto *', values, errors, attrs='maxlength="120" required') }}
+      {{ field('email', 'Correo electrónico *', values, errors, type='email', attrs='maxlength="120" required') }}
+    </div>
+    <div class="col-12 col-md-6">
+      {{ field('phone', 'Teléfono *', values, errors, attrs='maxlength="30" required') }}
+      {{ field('delivery_days', 'Tiempo de entrega (días) *', values, errors, type='number',
+               help='Días entre el pedido y la recepción. Se usa para estimar si el producto se agota antes de reponerlo.',
+               attrs='min="1" max="365" step="1" required') }}
+    </div>
+  </div>
+  <div class="ss-card-body border-top d-flex gap-2 justify-content-end">
+    <a class="btn btn-outline-secondary" href="{{ url_for('suppliers.detail', supplier_id=supplier.id) if editing else url_for('suppliers.list_suppliers') }}">Cancelar</a>
+    <button class="btn btn-primary"><i class="bi bi-check-lg"></i> {{ 'Guardar cambios' if editing else 'Registrar proveedor' }}</button>
+  </div>
+</form>
+</div></div>
+{% endblock %}

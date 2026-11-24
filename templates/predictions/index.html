@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Predicciones{% endblock %}
+{% block page_title %}Predicciones de demanda{% endblock %}
+{% block page_subtitle %}Inferencia en vivo con el modelo de regresión lineal entrenado (models/demand_model.joblib){% endblock %}
+
+{% block content %}
+<div class="ss-card mb-3">
+  <form class="ss-card-body row g-2 align-items-end" id="predictionForm">
+    <div class="col-12 col-md-6">
+      <label class="form-label" for="productSelect">Producto</label>
+      <select class="form-select" id="productSelect" required>
+        <option value="">Seleccione un producto...</option>
+        {% for product in products %}
+          <option value="{{ product.id }}" {{ 'selected' if selected_id == product.id }}>{{ product.name }} · stock {{ product.current_stock }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-6 col-md-3">
+      <label class="form-label" for="horizonSelect">Horizonte</label>
+      <select class="form-select" id="horizonSelect">
+        <option value="30">30 días</option><option value="60" selected>60 días</option><option value="90">90 días</option>
+      </select>
+    </div>
+    <div class="col-6 col-md-3">
+      <button class="btn btn-primary w-100" id="predictButton" {{ 'disabled' if not model_service.available }}>
+        <i class="bi bi-cpu"></i> Generar predicción
+      </button>
+    </div>
+  </form>
+</div>
+
+<div id="predictionError" class="alert alert-danger d-none"></div>
+<div id="predictionEmpty" class="ss-card ss-empty">
+  <i class="bi bi-graph-up-arrow fs-1 d-block mb-2"></i>
+  Seleccione un producto y genere una predicción. El cálculo se ejecuta en el servidor con el modelo entrenado.
+</div>
+
+<div id="predictionResult" class="d-none">
+  <div id="predictionWarnings"></div>
+  <div class="row g-3 mb-3" id="kpis"></div>
+
+  <div class="row g-3 mb-3">
+    <div class="col-12 col-xl-7">
+      <div class="ss-card h-100">
+        <div class="ss-card-header"><h2 class="ss-card-title">Historial de ventas y demanda estimada</h2>
+          <span class="text-secondary small">real (90 días) · pronóstico del modelo</span></div>
+        <div class="ss-card-body"><div class="ss-chart"><canvas id="demandChart"></canvas></div></div>
+      </div>
+    </div>
+    <div class="col-12 col-xl-5">
+      <div class="ss-card h-100">
+        <div class="ss-card-header"><h2 class="ss-card-title">Proyección del inventario</h2>
+          <span class="text-secondary small">stock − demanda acumulada</span></div>
+        <div class="ss-card-body"><div class="ss-chart"><canvas id="stockChart"></canvas></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-3">
+    <div class="col-12 col-xl-7">
+      <div class="ss-card h-100">
+        <div class="ss-card-header"><h2 class="ss-card-title">Factores considerados (predicción de hoy)</h2></div>
+        <div class="ss-card-body">
+          <p class="small text-secondary mb-2" id="factorIntro"></p>
+          <div class="table-responsive">
+            <table class="table ss-table" id="factorTable">
+              <thead><tr><th>Factor</th><th class="num">Valor</th><th>Efecto</th><th class="num">Unidades</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 col-xl-5 d-flex flex-column gap-3">
+      <div class="ss-card">
+        <div class="ss-card-header"><h2 class="ss-card-title">Recomendación de reposición</h2></div>
+        <div class="ss-card-body" id="recommendation"></div>
+      </div>
+      <div class="ss-card">
+        <div class="ss-card-header"><h2 class="ss-card-title">Cómo se calculó</h2></div>
+        <div class="ss-card-body small" id="methodNotes"></div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.PREDICTION_URLS = {
+    forecast: "{{ url_for('predictions.forecast') }}",
+    history: "{{ url_for('predictions.history', product_id=0) }}".replace(/0$/, ""),
+    order: "{{ url_for('products.add_order', product_id=0) }}",
+    next: "{{ request.path }}",
+  };
+</script>
+<script src="{{ url_for('static', filename='js/predictions.js') }}"></script>
+{% endblock %}

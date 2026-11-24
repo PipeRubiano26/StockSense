@@ -1,0 +1,29 @@
+@startuml c4_containers
+!pragma layout smetana
+!include <C4/C4_Container>
+
+title StockSense - Diagrama de Contenedores (C4 Nivel 2)
+LAYOUT_TOP_DOWN()
+
+Person(admin, "Administrador de inventario")
+Person(analyst, "Analista de datos")
+
+System_Boundary(stocksense, "StockSense (local en Windows o en Kubernetes con 2 réplicas)") {
+  Container(frontend, "Frontend web", "HTML5, CSS3, Bootstrap 5, JavaScript, Chart.js", "Plantillas renderizadas por Flask; gráficos y llamadas fetch() a la API JSON.")
+  Container(backend, "Backend Flask", "Python 3.12, Flask, Flask-SQLAlchemy", "Rutas (blueprints), validación, servicios de inventario, predicción, escenarios, alertas y sondas de salud. En Kubernetes: 2 réplicas con Gunicorn.")
+  ContainerDb(database, "Base de datos", "SQLite (stocksense.db)", "Productos, proveedores, ventas, movimientos, órdenes de compra y alertas.")
+  Container(model, "Modelo entrenado", "Joblib: Pipeline scikit-learn", "Preprocesamiento (interacciones, StandardScaler, OneHotEncoder) + LinearRegression. Solo lectura.")
+  Container(notebook, "Notebook de entrenamiento", "Jupyter, Pandas, NumPy, scikit-learn, Matplotlib, Seaborn", "Genera/carga el dataset sintético, entrena, evalúa y exporta el modelo.")
+  ContainerDb(dataset, "Dataset sintético", "CSV (data/synthetic_sales.csv)", "35 000 registros diarios de ventas simuladas.")
+}
+
+Rel(admin, frontend, "Usa", "Navegador")
+Rel(frontend, backend, "Formularios y API JSON", "HTTP")
+Rel(backend, database, "Lee y escribe", "SQLAlchemy ORM")
+Rel(backend, model, "Carga una vez al iniciar y ejecuta predict()", "joblib.load")
+Rel(analyst, notebook, "Ejecuta")
+Rel(notebook, dataset, "Genera y lee")
+Rel(notebook, model, "Entrena y exporta", "joblib.dump")
+
+SHOW_LEGEND()
+@enduml

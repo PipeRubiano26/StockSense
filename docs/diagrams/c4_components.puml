@@ -1,0 +1,46 @@
+@startuml c4_components
+!pragma layout smetana
+!include <C4/C4_Component>
+
+title StockSense - Diagrama de Componentes del Backend Flask (C4 Nivel 3)
+
+Container(frontend, "Frontend web", "Jinja2 + JavaScript + Chart.js")
+ContainerDb(database, "SQLite", "stocksense.db")
+Container(model, "Modelo entrenado", "demand_model.joblib")
+System_Ext(kubelet, "Kubelet (Kubernetes)", "Ejecuta las sondas y reinicia contenedores")
+
+Container_Boundary(backend, "Backend Flask (app.py)") {
+  Component(routes_crud, "Rutas de gestión", "Blueprints: dashboard, products, sales, suppliers, alerts", "Atienden formularios, listados y filtros.")
+  Component(routes_ml, "Rutas de inteligencia", "Blueprints: predictions, scenarios", "Páginas y API JSON /api/forecast, /api/predict, /api/run.")
+  Component(validators, "Validadores", "services/validators.py", "FormValidator: tipos, rangos, obligatorios; ValidationError.")
+  Component(inventory, "Servicio de inventario", "services/inventory_service.py", "CRUD, ventas con control de existencias, movimientos, órdenes, historial diario.")
+  Component(prediction, "Servicio de predicción", "services/prediction_service.py", "Carga el modelo, valida variables, predict(), agotamiento, riesgo, reposición y explicación.")
+  Component(scenario, "Servicio de escenarios", "services/scenario_service.py", "Normal, promoción, alta/baja demanda y retraso de proveedor.")
+  Component(alerts, "Servicio de alertas", "services/alert_service.py", "Crea, actualiza y resuelve alertas.")
+  Component(ml, "Módulos ML compartidos", "ml/features.py, ml/forecasting.py", "Definición de variables y pronóstico recursivo (los mismos que usa el notebook).")
+  Component(health, "Sondas de salud", "routes/health.py", "/health/live y /health/ready para Kubernetes; fallas simuladas solo si STOCKSENSE_ENABLE_CHAOS.")
+  Component(orm, "Acceso a datos", "database/models.py (Flask-SQLAlchemy)", "Modelos ORM, relaciones y restricciones CHECK.")
+}
+
+Rel(frontend, routes_crud, "HTTP GET/POST")
+Rel(frontend, routes_ml, "fetch() JSON")
+Rel(routes_crud, inventory, "Usa")
+Rel(routes_crud, alerts, "Recalcula alertas")
+Rel(routes_ml, prediction, "Solicita predicción")
+Rel(routes_ml, scenario, "Solicita escenarios")
+Rel(scenario, prediction, "Pronóstico con variables del escenario")
+Rel(alerts, prediction, "Análisis de agotamiento")
+Rel(prediction, inventory, "Historial de ventas y pedidos")
+Rel(prediction, ml, "Variables y pronóstico recursivo")
+Rel(inventory, validators, "Valida entradas")
+Rel(prediction, validators, "Valida variables")
+Rel(inventory, orm, "Consultas y transacciones")
+Rel(alerts, orm, "Lee y escribe alertas")
+Rel(orm, database, "SQL")
+Rel(kubelet, health, "GET liveness/readiness")
+Rel(health, orm, "SELECT 1")
+Rel(health, prediction, "¿Modelo disponible?")
+Rel(ml, model, "predict()")
+
+SHOW_LEGEND()
+@enduml

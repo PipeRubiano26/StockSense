@@ -1,0 +1,52 @@
+@startuml sequence_inference
+title StockSense - Secuencia de una predicción (inferencia en vivo)
+autonumber
+skinparam sequenceMessageAlign center
+skinparam responseMessageBelowArrow true
+
+actor "Usuario" as user
+participant "Navegador\n(predictions.js)" as ui
+participant "Ruta Flask\nPOST /predictions/api/forecast" as route
+participant "FormValidator" as validator
+participant "PredictionService" as service
+participant "inventory_service" as inventory
+database "SQLite" as db
+participant "ml.forecasting\nrecursive_forecast()" as forecasting
+participant "Pipeline\n(demand_model.joblib)" as model
+
+== Al iniciar Flask (una sola vez) ==
+service -> model : joblib.load()\n(sin entrenar)
+
+== Solicitud de predicción ==
+user -> ui : Selecciona producto y horizonte\ny pulsa "Generar predicción"
+ui -> route : JSON {product_id, horizon}
+route -> validator : integer(product_id), integer(horizon)
+alt datos inválidos
+  validator --> route : ValidationError
+  route --> ui : 400 {error, fields}
+  ui --> user : Muestra el mensaje de error
+else producto inexistente
+  route --> ui : 404
+else datos válidos
+  route -> db : get(Product, id)
+  route -> service : product_prediction(product, horizon)
+  service -> inventory : daily_sales_history(últimos 60 días)
+  inventory -> db : SUM(quantity) GROUP BY día
+  db --> inventory : ventas diarias
+  service -> inventory : sales_on_day(hoy)
+  service -> forecasting : recursive_forecast(model, historial, hoy, horizon)
+  loop por cada día del horizonte
+    forecasting -> forecasting : calcula variables\n(día semana, mes, precio, promoción,\nventa anterior, promedio 7d y 30d)
+    forecasting -> model : predict(variables)
+    model --> forecasting : unidades estimadas
+    forecasting -> forecasting : recorta a >= 0 y\nagrega la predicción al historial
+  end
+  forecasting --> service : demanda diaria estimada
+  service -> service : analyze_stock()\n(días hasta agotar, fecha, punto de reorden,\nriesgo, cantidad recomendada)
+  service -> inventory : pending_orders(producto)
+  service -> model : explain(): transform() + coeficientes
+  service --> route : resultado estructurado
+  route --> ui : 200 JSON
+  ui --> user : KPIs, gráficos, riesgo,\nfactores y recomendación
+end
+@enduml

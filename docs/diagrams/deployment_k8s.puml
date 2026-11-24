@@ -1,0 +1,38 @@
+@startuml deployment_k8s
+!pragma layout smetana
+!include <C4/C4_Deployment>
+
+title StockSense - Diagrama de despliegue en Kubernetes (minikube)
+LAYOUT_TOP_DOWN()
+
+Person(admin, "Administrador de inventario")
+
+Deployment_Node(pc, "Equipo Windows", "Docker Desktop") {
+  Deployment_Node(browser, "Navegador", "Chrome / Edge") {
+    Container(frontend, "Frontend web", "HTML, Bootstrap, Chart.js", "Páginas y llamadas a la API JSON")
+  }
+  Deployment_Node(cluster, "Clúster minikube", "Kubernetes v1.37") {
+    Deployment_Node(ns, "Namespace stocksense", "Kubernetes") {
+      Container(svc, "Service stocksense", "NodePort 30500", "Balancea solo entre réplicas que pasan readiness")
+      Deployment_Node(node, "Nodo minikube", "containerd") {
+        Deployment_Node(pod1, "Pod réplica 1", "Deployment stocksense") {
+          Container(app1, "StockSense", "Gunicorn + Flask + modelo .joblib", "Sondas: startup, liveness /health/live, readiness /health/ready")
+        }
+        Deployment_Node(pod2, "Pod réplica 2", "Deployment stocksense") {
+          Container(app2, "StockSense", "Gunicorn + Flask + modelo .joblib", "Misma imagen stocksense:1.0.2")
+        }
+        ContainerDb(db, "stocksense.db", "SQLite en PersistentVolume", "hostPath /data/stocksense")
+      }
+    }
+  }
+}
+
+Rel(admin, frontend, "Usa")
+Rel(frontend, svc, "HTTP", "minikube service (túnel)")
+Rel(svc, app1, "HTTP :5000")
+Rel(svc, app2, "HTTP :5000")
+Rel(app1, db, "SQLAlchemy")
+Rel(app2, db, "SQLAlchemy")
+
+SHOW_LEGEND()
+@enduml

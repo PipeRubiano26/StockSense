@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% from "_macros.html" import stock_badge, stock_bar %}
+{% block title %}Inventario{% endblock %}
+{% block page_title %}Inventario{% endblock %}
+{% block page_subtitle %}{{ products|length }} producto(s) · existencias sincronizadas con ventas y movimientos{% endblock %}
+{% block page_actions %}
+  <a class="btn btn-primary btn-sm" href="{{ url_for('products.create') }}"><i class="bi bi-plus-lg"></i> Nuevo producto</a>
+{% endblock %}
+
+{% block content %}
+<div class="ss-card">
+  <form class="ss-card-body row g-2 align-items-end border-bottom" method="get">
+    <div class="col-12 col-md-5">
+      <label class="form-label" for="q">Buscar por nombre o categoría</label>
+      <input class="form-control" id="q" name="q" value="{{ filters.search }}" placeholder="Ej. leche, Aseo...">
+    </div>
+    <div class="col-6 col-md-3">
+      <label class="form-label" for="category">Categoría</label>
+      <select class="form-select" id="category" name="category">
+        <option value="">Todas</option>
+        {% for category in categories %}
+          <option {{ 'selected' if filters.category == category }}>{{ category }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-6 col-md-2">
+      <label class="form-label" for="stock_level">Nivel de stock</label>
+      <select class="form-select" id="stock_level" name="stock_level">
+        <option value="">Todos</option>
+        {% for value, text in [('agotado', 'Agotado'), ('bajo', 'Bajo'), ('normal', 'Normal')] %}
+          <option value="{{ value }}" {{ 'selected' if filters.stock_level == value }}>{{ text }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-12 col-md-2 d-flex gap-2">
+      <button class="btn btn-primary flex-grow-1"><i class="bi bi-funnel"></i> Filtrar</button>
+      <a class="btn btn-outline-secondary" href="{{ url_for('products.list_products') }}" title="Limpiar filtros"><i class="bi bi-x-lg"></i></a>
+    </div>
+  </form>
+  <div class="table-responsive">
+    <table class="table table-hover ss-table" id="productsTable">
+      <thead><tr>
+        <th>Producto</th><th>Categoría</th><th>Proveedor</th><th class="num">Precio</th>
+        <th class="num">Stock</th><th class="num">Mínimo</th><th>Nivel</th><th></th>
+      </tr></thead>
+      <tbody>
+      {% for product in products %}
+        <tr data-row>
+          <td><a class="fw-semibold text-decoration-none" href="{{ url_for('products.detail', product_id=product.id) }}">{{ product.name }}</a></td>
+          <td>{{ product.category }}</td>
+          <td class="text-secondary">{{ product.supplier.name }}</td>
+          <td class="num">{{ product.price|money }}</td>
+          <td class="num fw-semibold">{{ product.current_stock|number }}<div class="mt-1">{{ stock_bar(product) }}</div></td>
+          <td class="num">{{ product.minimum_stock|number }}</td>
+          <td>{{ stock_badge(product) }}</td>
+          <td class="text-end text-nowrap">
+            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('predictions.index', product_id=product.id) }}" title="Predecir"><i class="bi bi-graph-up-arrow"></i></a>
+            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('products.edit', product_id=product.id) }}" title="Editar"><i class="bi bi-pencil"></i></a>
+            <form class="d-inline" method="post" action="{{ url_for('products.delete', product_id=product.id) }}"
+                  data-confirm="¿Eliminar '{{ product.name }}'? Se borrarán también sus ventas, movimientos, órdenes y alertas.">
+              <button class="btn btn-sm btn-outline-danger" title="Eliminar"><i class="bi bi-trash"></i></button>
+            </form>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="8" class="ss-empty">No hay productos que coincidan con los filtros.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

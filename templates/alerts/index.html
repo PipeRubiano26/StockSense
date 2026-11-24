@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% from "_macros.html" import risk_badge, order_status %}
+{% block title %}Alertas{% endblock %}
+{% block page_title %}Alertas de inventario{% endblock %}
+{% block page_subtitle %}Recalculadas con el stock actual, los pedidos pendientes y la predicción del modelo{% endblock %}
+{% block page_actions %}
+  <form method="post" action="{{ url_for('alerts.refresh') }}">
+    <button class="btn btn-primary btn-sm"><i class="bi bi-arrow-clockwise"></i> Recalcular</button>
+  </form>
+{% endblock %}
+
+{% block content %}
+{% set icons = {'stock_bajo': 'bi-arrow-down-circle', 'agotamiento_proximo': 'bi-hourglass-split',
+                'quiebre_antes_reposicion': 'bi-exclamation-octagon', 'reposicion': 'bi-cart-plus',
+                'retraso_proveedor': 'bi-truck'} %}
+<div class="row g-3 mb-3">
+  {% for alert_type, label in alert_types.items() %}
+    <div class="col-6 col-md-4 col-xl">
+      <a class="ss-card ss-stat d-flex justify-content-between text-decoration-none text-reset" href="#{{ alert_type }}">
+        <div><div class="ss-stat-label">{{ label }}</div><div class="ss-stat-value">{{ grouped[alert_type]|length }}</div></div>
+        <div class="ss-stat-icon {{ 'danger' if alert_type in ('quiebre_antes_reposicion', 'retraso_proveedor') else 'warning' }}"><i class="bi {{ icons[alert_type] }}"></i></div>
+      </a>
+    </div>
+  {% endfor %}
+</div>
+
+{% for alert_type, label in alert_types.items() %}
+<div class="ss-card mb-3" id="{{ alert_type }}">
+  <div class="ss-card-header">
+    <h2 class="ss-card-title"><i class="bi {{ icons[alert_type] }}"></i> {{ label }}</h2>
+    <span class="badge text-bg-light">{{ grouped[alert_type]|length }}</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table ss-table">
+      <thead><tr><th>Producto</th><th>Detalle</th><th>Riesgo</th><th>Desde</th><th></th></tr></thead>
+      <tbody>
+      {% for alert in grouped[alert_type] %}
+        {% set analysis = analyses.get(alert.product_id) %}
+        <tr>
+          <td class="fw-semibold text-nowrap"><a class="text-decoration-none" href="{{ url_for('products.detail', product_id=alert.product_id) }}">{{ alert.product.name }}</a></td>
+          <td class="small">{{ alert.message }}</td>
+          <td>{{ risk_badge(analysis.risk) if analysis else '—' }}</td>
+          <td class="text-nowrap text-secondary small">{{ alert.created_at.strftime('%Y-%m-%d %H:%M') }}</td>
+          <td class="text-end text-nowrap">
+            {% if alert_type == 'reposicion' and analysis and analysis.recommended_quantity > 0 %}
+            <form class="d-inline" method="post" action="{{ url_for('products.add_order', product_id=alert.product_id) }}">
+              <input type="hidden" name="quantity" value="{{ analysis.recommended_quantity }}">
+              <input type="hidden" name="next" value="{{ url_for('alerts.index') }}">
+              <button class="btn btn-sm btn-outline-primary" title="Crear orden por la cantidad recomendada"><i class="bi bi-cart-plus"></i> Pedir {{ analysis.recommended_quantity|number }}</button>
+            </form>
+            {% endif %}
+            <a class="btn btn-sm btn-outline-secondary" href="{{ url_for('predictions.index', product_id=alert.product_id) }}" title="Ver predicción"><i class="bi bi-graph-up-arrow"></i></a>
+            <form class="d-inline" method="post" action="{{ url_for('alerts.resolve', alert_id=alert.id) }}">
+              <button class="btn btn-sm btn-outline-success" title="Marcar como resuelta"><i class="bi bi-check2"></i></button>
+            </form>
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="5" class="ss-empty py-3">Sin alertas de este tipo.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if alert_type == 'retraso_proveedor' and delayed_orders %}
+  <div class="ss-card-body border-top">
+    <div class="small fw-semibold mb-2">Órdenes retrasadas</div>
+    {% for order in delayed_orders %}
+      <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
+        {{ order_status(order) }} <span>Orden #{{ order.id }} · {{ order.product.name }} · {{ order.quantity }} u. · {{ order.supplier.name }}</span>
+        <form method="post" action="{{ url_for('products.update_order', order_id=order.id, action='receive') }}">
+          <input type="hidden" name="next" value="{{ url_for('alerts.index') }}">
+          <button class="btn btn-sm btn-outline-success"><i class="bi bi-box-arrow-in-down"></i> Marcar recibida</button>
+        </form>
+      </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endfor %}
+
+<div class="ss-card">
+  <div class="ss-card-header"><h2 class="ss-card-title">Historial · alertas resueltas recientes</h2></div>
+  <div class="table-responsive">
+    <table class="table ss-table">
+      <thead><tr><th>Producto</th><th>Tipo</th><th>Mensaje</th><th>Creada</th></tr></thead>
+      <tbody>
+      {% for alert in resolved %}
+        <tr class="text-secondary"><td>{{ alert.product.name }}</td><td class="text-nowrap">{{ alert.type_label }}</td>
+          <td class="small">{{ alert.message }}</td><td class="text-nowrap small">{{ alert.created_at.strftime('%Y-%m-%d %H:%M') }}</td></tr>
+      {% else %}<tr><td colspan="4" class="ss-empty py-3">Aún no hay alertas resueltas.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

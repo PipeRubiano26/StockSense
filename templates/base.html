@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}StockSense{% endblock %} · StockSense</title>
+  <link rel="icon" href="{{ url_for('static', filename='images/favicon.svg') }}" type="image/svg+xml">
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap/bootstrap.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap-icons/bootstrap-icons.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+{% macro nav_link(target, icon, label, prefix) -%}
+  <li class="nav-item">
+    <a class="nav-link {{ 'active' if (request.endpoint or '').startswith(prefix) }}" href="{{ url_for(target) }}">
+      <i class="bi {{ icon }}"></i><span>{{ label }}</span>{{ caller() if caller }}
+    </a>
+  </li>
+{%- endmacro %}
+
+<aside class="ss-sidebar offcanvas-lg offcanvas-start d-flex flex-column" tabindex="-1" id="sidebar">
+  <div class="d-flex align-items-center justify-content-between px-3 py-3">
+    <a class="ss-brand d-flex align-items-center gap-2" href="{{ url_for('dashboard.index') }}">
+      <span class="ss-brand-mark"><i class="bi bi-box-seam"></i></span> StockSense
+    </a>
+    <button type="button" class="btn-close btn-close-white d-lg-none" data-bs-dismiss="offcanvas"
+            data-bs-target="#sidebar" aria-label="Cerrar"></button>
+  </div>
+  <nav class="px-2 flex-grow-1 overflow-auto">
+    <div class="ss-nav-label mt-2 mb-1">General</div>
+    <ul class="nav flex-column ss-nav gap-1">
+      {{ nav_link('dashboard.index', 'bi-grid-1x2', 'Dashboard', 'dashboard') }}
+      {{ nav_link('products.list_products', 'bi-box', 'Inventario', 'products') }}
+      {{ nav_link('sales.list_sales', 'bi-receipt', 'Ventas', 'sales') }}
+      {{ nav_link('suppliers.list_suppliers', 'bi-truck', 'Proveedores', 'suppliers') }}
+    </ul>
+    <div class="ss-nav-label mt-4 mb-1">Inteligencia</div>
+    <ul class="nav flex-column ss-nav gap-1">
+      {{ nav_link('predictions.index', 'bi-graph-up-arrow', 'Predicciones', 'predictions') }}
+      {{ nav_link('scenarios.index', 'bi-sliders', 'Simulador', 'scenarios') }}
+      {% call nav_link('alerts.index', 'bi-bell', 'Alertas', 'alerts') %}
+        {% if active_alert_count %}<span class="badge rounded-pill text-bg-danger ms-auto">{{ active_alert_count }}</span>{% endif %}
+      {% endcall %}
+    </ul>
+  </nav>
+  <div class="ss-sidebar-footer px-3 py-3">
+    {% if model_service.available %}
+      <div><i class="bi bi-cpu text-success"></i> Modelo v{{ model_service.metadata.get('model_version') }} cargado</div>
+      <div class="opacity-75">Entrenado: {{ (model_service.metadata.get('training_date') or '')[:10] }}</div>
+    {% else %}
+      <div class="text-warning"><i class="bi bi-exclamation-triangle"></i> Modelo no disponible</div>
+    {% endif %}
+    <div class="opacity-75 mt-1">Datos sintéticos · uso académico</div>
+    {% if pod_name %}<div class="mt-1" title="Réplica de Kubernetes que atendió esta página"><i class="bi bi-hdd-network text-info"></i> Pod: {{ pod_name }}</div>{% endif %}
+  </div>
+</aside>
+
+<div class="ss-main min-vh-100 d-flex flex-column">
+  <header class="ss-topbar px-3 px-lg-4 py-3 d-flex align-items-center gap-3">
+    <button class="btn btn-outline-secondary btn-sm d-lg-none" data-bs-toggle="offcanvas" data-bs-target="#sidebar"
+            aria-label="Abrir menú"><i class="bi bi-list"></i></button>
+    <div class="flex-grow-1">
+      <h1 class="ss-page-title">{% block page_title %}{% endblock %}</h1>
+      <div class="text-secondary small">{% block page_subtitle %}{% endblock %}</div>
+    </div>
+    <div class="d-flex gap-2 flex-wrap justify-content-end">{% block page_actions %}{% endblock %}</div>
+  </header>
+
+  <main class="flex-grow-1 px-3 px-lg-4 py-4">
+    {% if not model_service.available %}
+      <div class="alert alert-warning"><i class="bi bi-exclamation-triangle"></i> {{ model_service.load_error }}</div>
+    {% endif %}
+    {% if history_stale_days %}
+      <div class="alert alert-warning"><i class="bi bi-calendar-x"></i>
+        El historial de ventas termina el {{ history_last_sale.strftime('%d/%m/%Y') }}: hay {{ history_stale_days }} días recientes sin ventas
+        y el modelo los toma como demanda 0, por lo que las predicciones salen bajas.
+        Recargue los datos con <code>reiniciar_datos.bat</code> (o <code>k8s\reiniciar_datos.bat</code> en Kubernetes).</div>
+    {% endif %}
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+        <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+          {{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Cerrar"></button>
+        </div>
+      {% endfor %}
+    {% endwith %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
+
+<script src="{{ url_for('static', filename='vendor/bootstrap/bootstrap.bundle.min.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/chartjs/chart.umd.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

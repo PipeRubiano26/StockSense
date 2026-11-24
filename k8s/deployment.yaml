@@ -1,0 +1,97 @@
+# StockSense en Kubernetes: 2 réplicas con autorrecuperación.
+#  - Si un pod se cae, el Deployment crea otro (siempre debe haber 2).
+#  - Si el proceso se cuelga, la sonda liveness falla y Kubernetes reinicia el contenedor.
+#  - Si una réplica no puede atender (BD o modelo), la sonda readiness la saca del Service
+#    y el tráfico sigue llegando a la réplica sana.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stocksense
+  namespace: stocksense
+  labels:
+    app: stocksense
+spec:
+  replicas: 2
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app: stocksense
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0      # al actualizar nunca se quedan sin réplicas disponibles
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: stocksense
+    spec:
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 15
+      initContainers:
+        # 1) Da permisos al volumen para el usuario sin privilegios (uid 1000)
+        - name: permisos-volumen
+          image: stocksense:1.0.2
+          imagePullPolicy: Never
+          command: ["sh", "-c", "chown -R 1000:1000 /data"]
+          securityContext:
+            runAsUser: 0
+          volumeMounts:
+            - name: data
+              mountPath: /data
+        # 2) Crea las tablas y carga los datos iniciales solo si la base está vacía.
+        #    flock evita que las 2 réplicas carguen datos al mismo tiempo.
+        - name: init-db
+          image: stocksense:1.0.2
+          imagePullPolicy: Never
+          command: ["sh", "-c", "flock /data/init.lock flask --app app init-db"]
+          env:
+            - name: STOCKSENSE_SEED_ON_STARTUP
+              value: "false"
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      containers:
+        - name: stocksense
+          image: stocksense:1.0.2
+          imagePullPolicy: Never
+          ports:
+            - name: http
+              containerPort: 5000
+          env:
+            - name: STOCKSENSE_SEED_ON_STARTUP
+              value: "false"
+            - name: STOCKSENSE_ENABLE_CHAOS   # habilita /health/chaos/* para la demo
+              value: "true"
+          # Mientras arranca (carga del modelo) no se evalúa liveness
+          startupProbe:
+            httpGet: {path: /health/live, port: http}
+            periodSeconds: 2
+            failureThreshold: 30
+          # ¿Sigue vivo? 3 fallas seguidas (≈ 15 s) => reinicio del contenedor
+          livenessProbe:
+            httpGet: {path: /health/live, port: http}
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+          # ¿Puede atender? Si no, sale del balanceo hasta recuperarse (≈ 2-4 s)
+          readinessProbe:
+            httpGet: {path: /health/ready, port: http}
+            periodSeconds: 2
+            timeoutSeconds: 2
+            failureThreshold: 1
+          # Al apagar un pod: espera a que el Service deje de enviarle tráfico antes de cerrar
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sh", "-c", "sleep 5"]
+          resources:
+            requests: {cpu: 100m, memory: 256Mi}
+            limits: {cpu: "1", memory: 768Mi}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: stocksense-data

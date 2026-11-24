@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Error {{ code }}{% endblock %}
+{% block page_title %}Error {{ code }}{% endblock %}
+{% block content %}
+<div class="ss-card ss-empty">
+  <i class="bi bi-exclamation-octagon fs-1 d-block mb-2"></i>
+  <p class="mb-3">{{ message }}</p>
+  <a class="btn btn-primary" href="{{ url_for('dashboard.index') }}">Volver al dashboard</a>
+</div>
+{% endblock %}

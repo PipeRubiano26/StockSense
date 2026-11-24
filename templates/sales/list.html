@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Ventas{% endblock %}
+{% block page_title %}Ventas{% endblock %}
+{% block page_subtitle %}{{ page.total|number }} venta(s) registradas con los filtros actuales{% endblock %}
+{% block page_actions %}
+  <a class="btn btn-primary btn-sm" href="{{ url_for('sales.create') }}"><i class="bi bi-plus-lg"></i> Registrar venta</a>
+{% endblock %}
+
+{% block content %}
+<div class="ss-card">
+  <form class="ss-card-body row g-2 align-items-end border-bottom" method="get">
+    <div class="col-12 col-md-4">
+      <label class="form-label" for="product_id">Producto</label>
+      <select class="form-select" id="product_id" name="product_id">
+        <option value="">Todos</option>
+        {% for product in products %}
+          <option value="{{ product.id }}" {{ 'selected' if filters.product_id == product.id }}>{{ product.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-6 col-md-3">
+      <label class="form-label" for="date_from">Desde</label>
+      <input class="form-control" type="date" id="date_from" name="date_from" value="{{ filters.date_from or '' }}">
+    </div>
+    <div class="col-6 col-md-3">
+      <label class="form-label" for="date_to">Hasta</label>
+      <input class="form-control" type="date" id="date_to" name="date_to" value="{{ filters.date_to or '' }}">
+    </div>
+    <div class="col-12 col-md-2 d-flex gap-2">
+      <button class="btn btn-primary flex-grow-1"><i class="bi bi-funnel"></i> Filtrar</button>
+      <a class="btn btn-outline-secondary" href="{{ url_for('sales.list_sales') }}" title="Limpiar"><i class="bi bi-x-lg"></i></a>
+    </div>
+  </form>
+  <div class="table-responsive">
+    <table class="table table-hover ss-table">
+      <thead><tr><th>#</th><th>Fecha</th><th>Producto</th><th class="num">Cantidad</th><th class="num">Precio unit.</th>
+        <th>Promoción</th><th class="num">Total</th></tr></thead>
+      <tbody>
+      {% for sale in page.items %}
+        <tr>
+          <td class="text-secondary">{{ sale.id }}</td>
+          <td class="text-nowrap">{{ sale.sale_date.strftime('%Y-%m-%d %H:%M') }}</td>
+          <td><a class="text-decoration-none" href="{{ url_for('products.detail', product_id=sale.product_id) }}">{{ sale.product.name }}</a></td>
+          <td class="num fw-semibold">{{ sale.quantity|number }}</td>
+          <td class="num">{{ sale.unit_price|money }}</td>
+          <td>{% if sale.promotion %}<span class="ss-badge source-supuesto">−{{ sale.discount_percentage|round|int }} %</span>{% else %}<span class="text-secondary">—</span>{% endif %}</td>
+          <td class="num">{{ sale.total|money }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="7" class="ss-empty">No hay ventas con estos filtros.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if page.pages > 1 %}
+  {% set args = request.args.to_dict() %}
+  <nav class="ss-card-body d-flex justify-content-between align-items-center border-top">
+    <span class="text-secondary small">Página {{ page.page }} de {{ page.pages }}</span>
+    <ul class="pagination pagination-sm mb-0">
+      <li class="page-item {{ 'disabled' if not page.has_prev }}">
+        <a class="page-link" href="{{ url_for('sales.list_sales', **dict(args, page=page.prev_num or 1)) }}">Anterior</a></li>
+      <li class="page-item {{ 'disabled' if not page.has_next }}">
+        <a class="page-link" href="{{ url_for('sales.list_sales', **dict(args, page=page.next_num or page.pages)) }}">Siguiente</a></li>
+    </ul>
+  </nav>
+  {% endif %}
+</div>
+{% endblock %}

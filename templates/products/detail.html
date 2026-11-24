@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% from "_macros.html" import stock_badge, order_status %}
+{% block title %}{{ product.name }}{% endblock %}
+{% block page_title %}{{ product.name }}{% endblock %}
+{% block page_subtitle %}{{ product.category }} · {{ product.supplier.name }} · entrega en {{ product.supplier.delivery_days }} días{% endblock %}
+{% block page_actions %}
+  <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('products.edit', product_id=product.id) }}"><i class="bi bi-pencil"></i> Editar</a>
+  <a class="btn btn-outline-primary btn-sm" href="{{ url_for('sales.create', product_id=product.id) }}"><i class="bi bi-receipt"></i> Registrar venta</a>
+  <a class="btn btn-primary btn-sm" href="{{ url_for('predictions.index', product_id=product.id) }}"><i class="bi bi-graph-up-arrow"></i> Predecir</a>
+{% endblock %}
+
+{% block content %}
+<div class="row g-3 mb-3">
+  {% for label, value in [('Stock actual', product.current_stock|number), ('Stock mínimo', product.minimum_stock|number),
+                          ('Precio', product.price|money), ('Valor en inventario', (product.current_stock * product.price)|money)] %}
+    <div class="col-6 col-lg-3"><div class="ss-kpi"><div class="ss-kpi-label">{{ label }}</div><div class="ss-kpi-value">{{ value }}</div></div></div>
+  {% endfor %}
+</div>
+
+{% if active_alerts %}
+<div class="alert alert-warning">
+  <strong><i class="bi bi-bell"></i> Alertas activas:</strong>
+  <ul class="mb-0">{% for alert in active_alerts %}<li><strong>{{ alert.type_label }}:</strong> {{ alert.message }}</li>{% endfor %}</ul>
+</div>
+{% endif %}
+
+<div class="row g-3 mb-3">
+  <div class="col-12 col-xl-8">
+    <div class="ss-card h-100">
+      <div class="ss-card-header"><h2 class="ss-card-title">Ventas diarias · 90 días</h2>{{ stock_badge(product) }}</div>
+      <div class="ss-card-body"><div class="ss-chart sm"><canvas id="productSalesChart"></canvas></div></div>
+    </div>
+  </div>
+  <div class="col-12 col-xl-4 d-flex flex-column gap-3">
+    <div class="ss-card">
+      <div class="ss-card-header"><h2 class="ss-card-title">Registrar movimiento</h2></div>
+      <form class="ss-card-body" method="post" action="{{ url_for('products.add_movement', product_id=product.id) }}">
+        <div class="row g-2">
+          <div class="col-6">
+            <label class="form-label" for="movement_type">Tipo</label>
+            <select class="form-select" id="movement_type" name="movement_type">
+              <option value="entrada">Entrada</option><option value="ajuste">Ajuste (+/−)</option>
+            </select>
+          </div>
+          <div class="col-6">
+            <label class="form-label" for="mov_quantity">Cantidad</label>
+            <input class="form-control" id="mov_quantity" name="quantity" type="number" step="1" required>
+          </div>
+          <div class="col-12">
+            <label class="form-label" for="mov_description">Descripción</label>
+            <input class="form-control" id="mov_description" name="description" maxlength="200" required placeholder="Ej. conteo físico, merma, compra directa">
+          </div>
+        </div>
+        <div class="form-text mb-2">Las ventas generan su salida automáticamente. Un ajuste negativo reduce el stock.</div>
+        <button class="btn btn-outline-primary w-100"><i class="bi bi-arrow-left-right"></i> Registrar</button>
+      </form>
+    </div>
+    <div class="ss-card">
+      <div class="ss-card-header"><h2 class="ss-card-title">Nueva orden de compra</h2></div>
+      <form class="ss-card-body" method="post" action="{{ url_for('products.add_order', product_id=product.id) }}">
+        <label class="form-label" for="order_quantity">Cantidad</label>
+        <div class="input-group">
+          <input class="form-control" id="order_quantity" name="quantity" type="number" min="1" step="1" required>
+          <button class="btn btn-primary"><i class="bi bi-cart-plus"></i> Pedir</button>
+        </div>
+        <div class="form-text">Entrega esperada: {{ product.supplier.delivery_days }} días ({{ product.supplier.name }}). La cantidad recomendada se calcula en Predicciones.</div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-12 col-xl-6">
+    <div class="ss-card h-100">
+      <div class="ss-card-header"><h2 class="ss-card-title">Órdenes de compra</h2></div>
+      <div class="table-responsive">
+        <table class="table ss-table">
+          <thead><tr><th>#</th><th>Pedido</th><th>Entrega esperada</th><th class="num">Cant.</th><th>Estado</th><th></th></tr></thead>
+          <tbody>
+          {% for order in orders %}
+            <tr>
+              <td>{{ order.id }}</td><td>{{ order.order_date }}</td><td>{{ order.expected_delivery }}</td>
+              <td class="num">{{ order.quantity|number }}</td><td>{{ order_status(order) }}</td>
+              <td class="text-end text-nowrap">
+                {% if order.status == 'pendiente' %}
+                <form class="d-inline" method="post" action="{{ url_for('products.update_order', order_id=order.id, action='receive') }}">
+                  <button class="btn btn-sm btn-outline-success" title="Marcar como recibida"><i class="bi bi-box-arrow-in-down"></i></button></form>
+                <form class="d-inline" method="post" action="{{ url_for('products.update_order', order_id=order.id, action='cancel') }}" data-confirm="¿Cancelar la orden #{{ order.id }}?">
+                  <button class="btn btn-sm btn-outline-secondary" title="Cancelar"><i class="bi bi-x-lg"></i></button></form>
+                {% endif %}
+              </td>
+            </tr>
+          {% else %}<tr><td colspan="6" class="ss-empty">Sin órdenes registradas.</td></tr>{% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="col-12 col-xl-6">
+    <div class="ss-card h-100">
+      <div class="ss-card-header"><h2 class="ss-card-title">Últimos movimientos</h2><span class="text-secondary small">stock = suma de movimientos</span></div>
+      <div class="table-responsive" style="max-height: 420px">
+        <table class="table ss-table">
+          <thead><tr><th>Fecha</th><th>Tipo</th><th>Descripción</th><th class="num">Cantidad</th></tr></thead>
+          <tbody>
+          {% for movement in movements %}
+            <tr>
+              <td class="text-nowrap">{{ movement.movement_date.strftime('%Y-%m-%d %H:%M') }}</td>
+              <td class="text-capitalize">{{ movement.movement_type }}</td>
+              <td class="text-secondary">{{ movement.description }}</td>
+              <td class="num fw-semibold {{ 'text-success' if movement.quantity > 0 else 'text-danger' }}">{{ '%+d'|format(movement.quantity) }}</td>
+            </tr>
+          {% else %}<tr><td colspan="4" class="ss-empty">Sin movimientos.</td></tr>{% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+<script type="application/json" id="productSales">{{ sales_chart|tojson }}</script>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (() => {
+    const data = SS.readJSON("productSales");
+    new Chart(document.getElementById("productSalesChart"), {
+      type: "bar",
+      data: { labels: data.labels.map(SS.shortDate),
+              datasets: [{ label: "Unidades", data: data.units, backgroundColor: SS.colors.primary, borderRadius: 3 }] },
+      options: { plugins: { legend: { display: false } },
+                 scales: { x: { ticks: { maxTicksLimit: 10 }, grid: { display: false } }, y: { beginAtZero: true } } },
+    });
+  })();
+</script>
+{% endblock %}

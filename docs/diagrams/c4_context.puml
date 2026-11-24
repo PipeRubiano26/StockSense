@@ -1,0 +1,24 @@
+@startuml c4_context
+!pragma layout smetana
+!include <C4/C4_Context>
+
+title StockSense - Diagrama de Contexto (C4 Nivel 1)
+LAYOUT_TOP_DOWN()
+
+Person(admin, "Administrador de inventario", "Registra productos, ventas y proveedores; consulta predicciones, escenarios y alertas.")
+Person(analyst, "Analista de datos", "Genera el dataset sintético, entrena y evalúa el modelo en Jupyter.")
+
+System(stocksense, "StockSense", "Aplicación web local que gestiona el inventario y predice la demanda y el agotamiento con un modelo de regresión lineal.")
+
+System_Ext(browser, "Navegador web", "Chrome, Edge o Firefox en el mismo computador.")
+System_Ext(jupyter, "Jupyter Notebook", "Entorno de entrenamiento offline del modelo.")
+System_Ext(supplier, "Proveedores", "Entregan la mercancía. No hay integración automática: sus pedidos y tiempos de entrega se registran manualmente.")
+
+Rel(admin, browser, "Usa")
+Rel(browser, stocksense, "Solicita páginas y predicciones", "HTTP localhost:5000")
+Rel(analyst, jupyter, "Ejecuta el notebook de entrenamiento")
+Rel(jupyter, stocksense, "Exporta el modelo entrenado", "demand_model.joblib + model_metadata.json")
+Rel_R(admin, supplier, "Realiza pedidos de reposición", "fuera del sistema")
+
+SHOW_LEGEND()
+@enduml

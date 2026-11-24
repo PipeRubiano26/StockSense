@@ -1,0 +1,39 @@
+{# Componentes reutilizables de las plantillas #}
+
+{% macro field(name, label, values, errors, type='text', help=None, attrs='') -%}
+  <div class="mb-3">
+    <label class="form-label" for="{{ name }}">{{ label }}</label>
+    <input type="{{ type }}" class="form-control {{ 'is-invalid' if errors.get(name) }}" id="{{ name }}"
+           name="{{ name }}" value="{{ values.get(name, '') if values.get(name) is not none else '' }}" {{ attrs|safe }}>
+    {% if errors.get(name) %}<div class="invalid-feedback">{{ errors[name] }}</div>{% endif %}
+    {% if help %}<div class="form-text">{{ help }}</div>{% endif %}
+  </div>
+{%- endmacro %}
+
+{% macro stock_badge(product) -%}
+  {% set labels = {'agotado': 'Agotado', 'bajo': 'Stock bajo', 'normal': 'Normal'} %}
+  <span class="ss-badge stock-{{ product.stock_level }}">{{ labels[product.stock_level] }}</span>
+{%- endmacro %}
+
+{% macro risk_badge(risk) -%}
+  <span class="ss-badge risk-{{ risk|replace('í', 'i') }}">Riesgo {{ risk }}</span>
+{%- endmacro %}
+
+{% macro stock_bar(product) -%}
+  {% set reference = [product.minimum_stock * 3, 1]|max %}
+  {% set percent = [(product.current_stock / reference * 100)|round, 100]|min %}
+  {% set color = '#dc2626' if product.stock_level == 'agotado' else ('#d97706' if product.stock_level == 'bajo' else '#059669') %}
+  <div class="ss-progress" title="Stock frente a 3× el mínimo"><span style="width: {{ percent }}%; background: {{ color }}"></span></div>
+{%- endmacro %}
+
+{% macro order_status(order) -%}
+  {% if order.is_delayed %}
+    <span class="ss-badge risk-alto">Retrasada {{ order.days_delayed }} d</span>
+  {% elif order.status == 'pendiente' %}
+    <span class="ss-badge risk-medio">Pendiente</span>
+  {% elif order.status == 'recibida' %}
+    <span class="ss-badge risk-bajo">Recibida</span>
+  {% else %}
+    <span class="ss-badge" style="background:#f1f5f9;color:#64748b">Cancelada</span>
+  {% endif %}
+{%- endmacro %}

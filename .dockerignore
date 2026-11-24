@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ipynb_checkpoints/
+stocksense.db
+instance/
+data/
+notebooks/
+docs/
+tests/
+k8s/
+*.bat
+*.ps1
+plantuml.jar

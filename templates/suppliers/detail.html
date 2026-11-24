@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% from "_macros.html" import stock_badge, order_status %}
+{% block title %}{{ supplier.name }}{% endblock %}
+{% block page_title %}{{ supplier.name }}{% endblock %}
+{% block page_subtitle %}{{ supplier.contact }} · {{ supplier.email }} · {{ supplier.phone }}{% endblock %}
+{% block page_actions %}
+  <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('suppliers.edit', supplier_id=supplier.id) }}"><i class="bi bi-pencil"></i> Editar</a>
+  <form method="post" action="{{ url_for('suppliers.delete', supplier_id=supplier.id) }}" data-confirm="¿Eliminar el proveedor {{ supplier.name }}?">
+    <button class="btn btn-outline-danger btn-sm"><i class="bi bi-trash"></i> Eliminar</button>
+  </form>
+{% endblock %}
+
+{% block content %}
+<div class="row g-3 mb-3">
+  {% set pending = supplier.purchase_orders|selectattr('status', 'equalto', 'pendiente')|list %}
+  {% for label, value in [('Tiempo de entrega', supplier.delivery_days ~ ' días'), ('Productos asociados', supplier.products|length),
+                          ('Pedidos pendientes', pending|length), ('Pedidos retrasados', pending|selectattr('is_delayed')|list|length)] %}
+    <div class="col-6 col-lg-3"><div class="ss-kpi"><div class="ss-kpi-label">{{ label }}</div><div class="ss-kpi-value">{{ value }}</div></div></div>
+  {% endfor %}
+</div>
+
+<div class="row g-3">
+  <div class="col-12 col-xl-7">
+    <div class="ss-card h-100">
+      <div class="ss-card-header"><h2 class="ss-card-title">Productos asociados</h2></div>
+      <div class="table-responsive">
+        <table class="table ss-table">
+          <thead><tr><th>Producto</th><th>Categoría</th><th class="num">Stock</th><th>Nivel</th></tr></thead>
+          <tbody>
+          {% for product in supplier.products %}
+            <tr><td><a href="{{ url_for('products.detail', product_id=product.id) }}">{{ product.name }}</a></td>
+                <td>{{ product.category }}</td><td class="num">{{ product.current_stock|number }}</td><td>{{ stock_badge(product) }}</td></tr>
+          {% else %}<tr><td colspan="4" class="ss-empty">Sin productos asociados.</td></tr>{% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <form class="ss-card-body border-top" method="post" action="{{ url_for('suppliers.associate', supplier_id=supplier.id) }}">
+        <label class="form-label" for="product_id">Asociar un producto a este proveedor</label>
+        <div class="input-group">
+          <select class="form-select" id="product_id" name="product_id" required>
+            <option value="">Seleccione un producto...</option>
+            {% for product in other_products %}<option value="{{ product.id }}">{{ product.name }} (actual: {{ product.supplier.name }})</option>{% endfor %}
+          </select>
+          <button class="btn btn-primary"><i class="bi bi-link-45deg"></i> Asociar</button>
+        </div>
+        <div class="form-text">El producto pasará a abastecerse con este proveedor y usará su tiempo de entrega.</div>
+      </form>
+    </div>
+  </div>
+  <div class="col-12 col-xl-5">
+    <div class="ss-card h-100">
+      <div class="ss-card-header"><h2 class="ss-card-title">Órdenes recientes</h2></div>
+      <div class="table-responsive">
+        <table class="table ss-table">
+          <thead><tr><th>#</th><th>Producto</th><th>Entrega</th><th class="num">Cant.</th><th>Estado</th></tr></thead>
+          <tbody>
+          {% for order in orders %}
+            <tr><td>{{ order.id }}</td><td>{{ order.product.name }}</td><td class="text-nowrap">{{ order.expected_delivery }}</td>
+                <td class="num">{{ order.quantity|number }}</td><td>{{ order_status(order) }}</td></tr>
+          {% else %}<tr><td colspan="5" class="ss-empty">Sin órdenes.</td></tr>{% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

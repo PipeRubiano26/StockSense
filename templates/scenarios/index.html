@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}Simulador{% endblock %}
+{% block page_title %}Simulador de escenarios{% endblock %}
+{% block page_subtitle %}Compare cómo cambian la demanda y el agotamiento ante distintas condiciones comerciales{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+  <div class="col-12 col-xl-3">
+    <form class="ss-card" id="scenarioForm">
+      <div class="ss-card-body">
+        <div class="mb-3">
+          <label class="form-label" for="scenarioProduct">Producto</label>
+          <select class="form-select" id="scenarioProduct" name="product_id" required>
+            <option value="">Seleccione...</option>
+            {% for product in products %}
+              <option value="{{ product.id }}" {{ 'selected' if selected_id == product.id }}>{{ product.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        {% set controls = [
+          ('discount', 'Descuento de la promoción', '%', 5, 60, 5, defaults.discount, 'Modifica las variables de entrada del modelo.'),
+          ('promotion_days', 'Duración de la promoción', 'días', 1, 30, 1, defaults.promotion_days, ''),
+          ('demand_increase', 'Incremento de demanda (supuesto)', '%', 0, 150, 5, defaults.demand_increase, 'Hipótesis manual, no aprendida por el modelo.'),
+          ('demand_decrease', 'Reducción de demanda (supuesto)', '%', 0, 90, 5, defaults.demand_decrease, 'Hipótesis manual, no aprendida por el modelo.'),
+          ('supplier_delay', 'Retraso del proveedor', 'días', 0, 30, 1, defaults.supplier_delay, 'Se suma al tiempo de entrega.'),
+        ] %}
+        {% for name, label, unit, min, max, step, value, help in controls %}
+        <div class="mb-3">
+          <label class="form-label d-flex justify-content-between" for="{{ name }}">
+            <span>{{ label }}</span><span class="text-primary"><output id="{{ name }}Value">{{ value }}</output> {{ unit }}</span>
+          </label>
+          <input type="range" class="form-range" id="{{ name }}" name="{{ name }}" min="{{ min }}" max="{{ max }}" step="{{ step }}" value="{{ value }}">
+          {% if help %}<div class="form-text mt-0">{{ help }}</div>{% endif %}
+        </div>
+        {% endfor %}
+        <div class="mb-3">
+          <label class="form-label" for="horizon">Horizonte</label>
+          <select class="form-select" id="horizon" name="horizon">
+            <option value="30">30 días</option><option value="60" selected>60 días</option><option value="90">90 días</option>
+          </select>
+        </div>
+        <button class="btn btn-primary w-100" id="scenarioButton" {{ 'disabled' if not model_service.available }}>
+          <i class="bi bi-sliders"></i> Comparar escenarios</button>
+        <div class="form-text">Al mover un control, la comparación se recalcula con el modelo.</div>
+      </div>
+    </form>
+  </div>
+
+  <div class="col-12 col-xl-9">
+    <div id="scenarioError" class="alert alert-danger d-none"></div>
+    <div id="scenarioEmpty" class="ss-card ss-empty">
+      <i class="bi bi-sliders fs-1 d-block mb-2"></i>Seleccione un producto para comparar los cinco escenarios.
+    </div>
+    <div id="scenarioResult" class="d-none">
+      <div id="scenarioWarnings"></div>
+      <div class="ss-notice mb-3">
+        <span class="ss-badge source-modelo">modelo</span> el resultado sale directamente de <code>predict()</code> con las variables del escenario.
+        <span class="ss-badge source-supuesto ms-2">modelo + supuesto</span> se aplica una hipótesis manual sobre la predicción normal; ese efecto <strong>no</strong> lo aprendió el modelo.
+      </div>
+      <div class="ss-scenario-grid mb-3" id="scenarioCards"></div>
+      <div class="row g-3">
+        <div class="col-12 col-xxl-7">
+          <div class="ss-card h-100">
+            <div class="ss-card-header"><h2 class="ss-card-title">Proyección del inventario por escenario</h2></div>
+            <div class="ss-card-body"><div class="ss-chart"><canvas id="scenarioStockChart"></canvas></div>
+              <div class="form-text">El escenario de retraso usa la misma demanda que el normal: cambia el tiempo de entrega, el riesgo y la reposición.</div></div>
+          </div>
+        </div>
+        <div class="col-12 col-xxl-5">
+          <div class="ss-card h-100">
+            <div class="ss-card-header"><h2 class="ss-card-title">Días hasta agotarse vs. tiempo de entrega</h2></div>
+            <div class="ss-card-body"><div class="ss-chart"><canvas id="scenarioDaysChart"></canvas></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>window.SCENARIO_URL = "{{ url_for('scenarios.run') }}";</script>
+<script src="{{ url_for('static', filename='js/scenarios.js') }}"></script>
+{% endblock %}

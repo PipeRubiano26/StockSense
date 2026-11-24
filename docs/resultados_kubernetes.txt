@@ -1,0 +1,65 @@
+StockSense - Pruebas de autorrecuperación en Kubernetes
+Fecha: 2026-11-10
+Entorno: Windows 10, Docker Desktop 29.7.2, minikube v1.39.0 (driver docker, 2 nodos), Kubernetes v1.37.0, kubectl v1.37.0
+Imagen: stocksense:1.0.1 (python:3.12.8-slim, Gunicorn 23, modelo demand_model.joblib v1.0.0)
+
+== Despliegue ==
+$ kubectl apply -k k8s
+namespace/stocksense created
+service/stocksense created
+persistentvolume/stocksense-data created
+persistentvolumeclaim/stocksense-data created
+deployment.apps/stocksense created
+poddisruptionbudget.policy/stocksense created
+deployment "stocksense" successfully rolled out
+
+$ kubectl -n stocksense get pvc
+NAME              STATUS   VOLUME            CAPACITY   ACCESS MODES   STORAGECLASS
+stocksense-data   Bound    stocksense-data   1Gi        RWO            stocksense-local
+
+Logs de los initContainers init-db (flock evita la doble carga):
+  réplica 1: Datos iniciales cargados (20 productos, 5 proveedores, 12 meses de ventas).
+  réplica 2: La base de datos ya tenía datos; no se duplicaron.
+Logs de ambas réplicas: INFO stocksense: Modelo cargado: versión 1.0.0
+
+Balanceo del Service (6 consultas a /health/ready desde un pod del clúster):
+  stocksense-7997584c58-vbxbl ok {'database': 'ok', 'model': 'ok'}
+  stocksense-7997584c58-vbxbl ok {'database': 'ok', 'model': 'ok'}
+  stocksense-7997584c58-9gvp2 ok {'database': 'ok', 'model': 'ok'}
+  stocksense-7997584c58-9gvp2 ok {'database': 'ok', 'model': 'ok'}
+  stocksense-7997584c58-vbxbl ok {'database': 'ok', 'model': 'ok'}
+  stocksense-7997584c58-9gvp2 ok {'database': 'ok', 'model': 'ok'}
+
+Predicción en vivo a través del Service (POST /predictions/api/forecast, product_id=1, horizon=30):
+  demand_today 40.68, demand_7d 304.5, demand_30d 1367.6, days_to_stockout 3.3, risk "medio"
+
+== Prueba 1 (configuración inicial: readiness 5 s x 2, sin preStop) ==
+Cliente: GET /health/live cada 0.25 s durante 150 s a través del Service.
+- Borrar un pod:            pod nuevo listo en ~11 s; ~1 s de errores (el pod cerraba con tráfico).
+- Crash del proceso:        RESTARTS 1; sin errores registrados.
+- Cuelgue (liveness):       eventos:
+    Warning  Unhealthy  Liveness probe failed: HTTP probe failed with statuscode: 503
+    Normal   Killing    Container stocksense failed liveness probe, will be restarted
+  ~10 s de errores (la réplica tardaba 10 s en salir del balanceo).
+- Borrar TODOS los pods:    ~12 s sin servicio (no queda ninguna réplica; esperado).
+  Persistencia: antes  ventas: 7192 productos: 20
+                después ventas: 7192 productos: 20   (sin duplicar)
+RESUMEN ok=513 fallos=48
+
+Mejoras aplicadas: readinessProbe 2 s x 1 falla; preStop "sleep 5"; el cuelgue simulado
+también hace fallar las páginas (realista). Actualización a 1.0.1 por RollingUpdate.
+
+== Prueba 2 (configuración final) ==
+Cliente: GET /predictions/api/model cada 0.25 s durante 110 s a través del Service.
+t~5  s  kubectl delete pod stocksense-6845df5d97-dkfjd     -> 0 errores
+t~35 s  POST /health/chaos/crash                          -> 2 errores (36.9 s ConnectionResetError, 37.4 s URLError)
+t~65 s  POST /health/chaos/hang                           -> 2 errores (68.3 s y 68.5 s HTTP 503)
+RESUMEN ok=427 fallos=4   (99.1 % de disponibilidad durante las fallas)
+
+Estado final:
+NAME                          READY   STATUS    RESTARTS      AGE
+stocksense-6845df5d97-9c26b   1/1     Running   1 (75s ago)   107s
+stocksense-6845df5d97-gg4pp   1/1     Running   1 (26s ago)   2m38s
+
+Acceso desde el navegador: minikube service stocksense -n stocksense
+  4 visitas al dashboard mostraron "Pod: stocksense-6845df5d97-9c26b" (3) y "Pod: stocksense-6845df5d97-gg4pp" (1).

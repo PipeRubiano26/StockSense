@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% from "_macros.html" import field %}
+{% block title %}Registrar venta{% endblock %}
+{% block page_title %}Registrar venta{% endblock %}
+{% block page_subtitle %}La venta descuenta el inventario automáticamente; no se permite vender más de lo disponible{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-12 col-xl-8">
+    <form method="post" class="ss-card" novalidate>
+      <div class="ss-card-body row g-0 gx-4">
+        <div class="col-12">
+          <div class="mb-3">
+            <label class="form-label" for="product_id">Producto *</label>
+            <select class="form-select {{ 'is-invalid' if errors.get('product_id') }}" id="product_id" name="product_id">
+              <option value="">Seleccione...</option>
+              {% for product in products %}
+                <option value="{{ product.id }}" data-stock="{{ product.current_stock }}" data-price="{{ product.price }}"
+                        {{ 'selected' if values.get('product_id')|string == product.id|string }}>
+                  {{ product.name }} — stock {{ product.current_stock }}</option>
+              {% endfor %}
+            </select>
+            {% if errors.get('product_id') %}<div class="invalid-feedback">{{ errors.product_id }}</div>{% endif %}
+            <div class="form-text" id="stockHelp"></div>
+          </div>
+        </div>
+        <div class="col-12 col-md-6">
+          {{ field('quantity', 'Cantidad *', values, errors, type='number', attrs='min="1" step="1" required') }}
+        </div>
+        <div class="col-12 col-md-6">
+          {{ field('sale_date', 'Fecha de la venta', values, errors, type='date', attrs='max="' ~ today ~ '"',
+                   help='Por defecto, hoy. No se permiten fechas futuras.') }}
+        </div>
+        <div class="col-12 col-md-6">
+          <div class="form-check form-switch mb-3 mt-md-4">
+            <input class="form-check-input" type="checkbox" role="switch" id="promotion" name="promotion" value="1"
+                   {{ 'checked' if values.get('promotion') }}>
+            <label class="form-check-label" for="promotion">Venta en promoción</label>
+          </div>
+        </div>
+        <div class="col-12 col-md-6">
+          {{ field('discount_percentage', 'Descuento (%)', values, errors, type='number',
+                   help='Solo aplica si la venta está en promoción.', attrs='min="0" max="90" step="1"') }}
+        </div>
+      </div>
+      <div class="ss-card-body border-top d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div class="fw-semibold" id="totalPreview"></div>
+        <div class="d-flex gap-2">
+          <a class="btn btn-outline-secondary" href="{{ url_for('sales.list_sales') }}">Cancelar</a>
+          <button class="btn btn-primary"><i class="bi bi-check-lg"></i> Registrar venta</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (() => {
+    // Ayudas visuales: el control real de existencias se hace en el servidor
+    const product = document.getElementById("product_id");
+    const quantity = document.getElementById("quantity");
+    const promotion = document.getElementById("promotion");
+    const discount = document.getElementById("discount_percentage");
+    const help = document.getElementById("stockHelp");
+    const total = document.getElementById("totalPreview");
+
+    function update() {
+      discount.disabled = !promotion.checked;
+      if (!promotion.checked) discount.value = "";
+      const option = product.selectedOptions[0];
+      if (!option || !option.value) { help.textContent = ""; total.textContent = ""; return; }
+      const stock = Number(option.dataset.stock), price = Number(option.dataset.price);
+      const qty = Number(quantity.value || 0), pct = promotion.checked ? Number(discount.value || 0) : 0;
+      help.textContent = `Disponible: ${SS.number(stock)} unidades · precio ${SS.money(price)}`;
+      help.className = qty > stock ? "form-text text-danger fw-semibold" : "form-text";
+      if (qty > stock) help.textContent += " — la cantidad supera el stock";
+      total.textContent = qty > 0 ? `Total: ${SS.money(qty * price * (1 - pct / 100))}` : "";
+    }
+    [product, quantity, promotion, discount].forEach((el) => el.addEventListener("input", update));
+    update();
+  })();
+</script>
+{% endblock %}

@@ -1,0 +1,141 @@
+{
+  "model_name": "StockSense - demanda diaria",
+  "model_version": "1.0.0",
+  "training_date": "2026-11-08T21:49:59",
+  "algorithm": "LinearRegression (scikit-learn) dentro de un Pipeline",
+  "pipeline_steps": [
+    "interactions",
+    "preprocess",
+    "regressor"
+  ],
+  "target": "units_sold",
+  "input_features": [
+    "price",
+    "discount_percentage",
+    "promotion",
+    "previous_sales",
+    "average_sales_7d",
+    "average_sales_30d",
+    "day_of_week",
+    "month",
+    "category"
+  ],
+  "numeric_features": [
+    "price",
+    "discount_percentage",
+    "promotion",
+    "previous_sales",
+    "average_sales_7d",
+    "average_sales_30d"
+  ],
+  "categorical_features": [
+    "day_of_week",
+    "month",
+    "category"
+  ],
+  "derived_features": [
+    "discount_x_avg30",
+    "weekend_x_avg30"
+  ],
+  "excluded_features": {
+    "units_available": "decisión de inventario, no demanda",
+    "stockout": "solo se usa para limpiar ventas censuradas",
+    "rotation": "parámetro oculto del simulador",
+    "product_id": "no generaliza a productos nuevos"
+  },
+  "categories": [
+    "Abarrotes",
+    "Aseo",
+    "Bebidas",
+    "Cuidado personal",
+    "Lácteos",
+    "Snacks"
+  ],
+  "dataset": {
+    "description": "Dataset SINTÉTICO de ventas diarias generado con ml/generate_dataset.py (semilla 42). Experimento académico, no son ventas reales.",
+    "file": "data/synthetic_sales.csv",
+    "seed": 42,
+    "total_records": 35000,
+    "products": 50,
+    "date_range": [
+      "2024-01-31",
+      "2025-12-30"
+    ],
+    "excluded_stockout_records": 292,
+    "modeling_records": 34708
+  },
+  "split": {
+    "type": "temporal",
+    "train": {
+      "records": 22648,
+      "until": "2025-04-30"
+    },
+    "validation": {
+      "records": 6063,
+      "from": "2025-05-01",
+      "until": "2025-08-31"
+    },
+    "test": {
+      "records": 5997,
+      "from": "2025-09-01",
+      "until": "2025-12-30"
+    },
+    "final_model_trained_on": "entrenamiento + validación",
+    "final_training_records": 28711
+  },
+  "metrics": {
+    "validation": {
+      "MAE": 6.5495,
+      "RMSE": 11.7464,
+      "R2": 0.8217
+    },
+    "test": {
+      "MAE": 6.6272,
+      "RMSE": 11.837,
+      "R2": 0.8191
+    },
+    "baseline_validation_avg7d": {
+      "MAE": 7.45,
+      "RMSE": 14.4395,
+      "R2": 0.7306
+    },
+    "recursive_30d_test": {
+      "MAE_total_30d": 92.8914,
+      "MAPE_total_30d": 0.1425,
+      "R2_total_30d": 0.8359
+    }
+  },
+  "model_comparison_validation": {
+    "Línea base (promedio 7 días)": {
+      "MAE": 7.45,
+      "RMSE": 14.4395,
+      "R2": 0.7306
+    },
+    "A: numéricas": {
+      "MAE": 7.0535,
+      "RMSE": 13.0403,
+      "R2": 0.7803
+    },
+    "B: + OneHot (día, mes, categoría)": {
+      "MAE": 7.0334,
+      "RMSE": 12.9175,
+      "R2": 0.7844
+    },
+    "C: B + interacciones": {
+      "MAE": 6.5495,
+      "RMSE": 11.7464,
+      "R2": 0.8217
+    },
+    "D: C + product_id": {
+      "MAE": 6.3036,
+      "RMSE": 11.572,
+      "R2": 0.827
+    }
+  },
+  "versions": {
+    "python": "3.12.1",
+    "scikit-learn": "1.9.1",
+    "pandas": "3.1.1",
+    "numpy": "2.5.4"
+  }
+}

@@ -1,0 +1,82 @@
+@startuml activity_system
+title StockSense - Flujo de funcionamiento del sistema
+
+start
+partition "Inicio de la aplicación (Flask)" {
+  if (¿Existe models/demand_model.joblib?) then (sí)
+    :Cargar el Pipeline con joblib\n(sin reentrenar);
+  else (no)
+    :Marcar el modelo como no disponible\n(el CRUD sigue funcionando);
+  endif
+  if (¿Base de datos vacía?) then (sí)
+    :Cargar datos sintéticos iniciales\n(20 productos, 5 proveedores, 12 meses);
+  else (no)
+    :Conservar los datos existentes\n(no se duplican);
+  endif
+}
+
+:Usuario elige una operación;
+
+if (¿Qué operación?) then (registrar venta)
+  :Validar campos\n(producto, cantidad > 0, descuento, fecha);
+  if (¿Datos válidos?) then (no)
+    :Mostrar errores en el formulario;
+    stop
+  endif
+  if (¿Cantidad <= stock disponible?) then (no)
+    :Rechazar la venta\n"Stock insuficiente";
+    stop
+  endif
+  :Guardar Sale + InventoryMovement (salida)\ny descontar el stock en la misma transacción;
+else (predicción o escenario)
+  :Validar producto y parámetros;
+  if (¿Datos válidos?) then (no)
+    :Responder 400 con los errores;
+    stop
+  endif
+  if (¿Modelo disponible?) then (no)
+    :Responder 503\n"Ejecute el notebook";
+    stop
+  endif
+  :Obtener historial diario de ventas (SQLite);
+  if (¿Escenario de promoción?) then (sí)
+    :Modificar variables de entrada del modelo\n(promotion = 1, discount_percentage);
+  else (no)
+  endif
+  :Pronóstico recursivo día a día con predict()\n(valores negativos se recortan a 0);
+  if (¿Escenario de alta o baja demanda?) then (sí)
+    :Aplicar multiplicador sobre la predicción\n(supuesto manual, etiquetado como hipótesis);
+  else (no)
+  endif
+  if (¿Escenario de retraso del proveedor?) then (sí)
+    :Sumar días al tiempo de entrega;
+  else (no)
+  endif
+  :Calcular días hasta agotar, fecha estimada,\npunto de reorden, riesgo y reposición;
+endif
+
+partition "Generación de alertas" {
+  if (¿stock <= stock mínimo?) then (sí)
+    :Alerta "Stock bajo";
+  else (no)
+  endif
+  if (¿Se agota antes del tiempo de entrega\ny no hay pedido que llegue a tiempo?) then (sí)
+    :Alerta "Se agota antes de reponer"\n(riesgo alto o crítico);
+  elseif (¿Se agota antes de entrega + 7 días?) then (sí)
+    :Alerta "Próximo a agotarse";
+  else (no)
+  endif
+  if (¿stock + pedidos pendientes <= punto de reorden?) then (sí)
+    :Alerta "Requiere reposición"\ncon la cantidad recomendada;
+  else (no)
+  endif
+  if (¿Pedido pendiente con fecha de entrega vencida?) then (sí)
+    :Alerta "Retraso del proveedor";
+  else (no)
+  endif
+  :Resolver las alertas cuya condición ya no se cumple;
+}
+
+:Mostrar resultados, gráficos y alertas al usuario;
+stop
+@enduml

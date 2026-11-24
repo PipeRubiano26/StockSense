@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% from "_macros.html" import field %}
+{% set editing = product is not none %}
+{% block title %}{{ 'Editar producto' if editing else 'Nuevo producto' }}{% endblock %}
+{% block page_title %}{{ 'Editar: ' ~ product.name if editing else 'Registrar producto' }}{% endblock %}
+{% block page_subtitle %}Los campos marcados con * son obligatorios{% endblock %}
+
+{% block content %}
+{% if errors %}<div class="alert alert-danger">Revise los campos marcados en rojo.</div>{% endif %}
+<form method="post" class="ss-card" novalidate>
+  <div class="ss-card-body row g-0 gx-4">
+    <div class="col-12 col-lg-6">
+      {{ field('name', 'Nombre *', values, errors, attrs='maxlength="120" required') }}
+      <div class="mb-3">
+        <label class="form-label" for="category">Categoría *</label>
+        <select class="form-select {{ 'is-invalid' if errors.get('category') }}" id="category" name="category">
+          <option value="">Seleccione...</option>
+          {% for category in categories %}
+            <option {{ 'selected' if values.get('category') == category }}>{{ category }}</option>
+          {% endfor %}
+        </select>
+        {% if errors.get('category') %}<div class="invalid-feedback">{{ errors.category }}</div>{% endif %}
+        <div class="form-text">Las categorías coinciden con las que conoce el modelo de predicción.</div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="supplier_id">Proveedor *</label>
+        <select class="form-select {{ 'is-invalid' if errors.get('supplier_id') }}" id="supplier_id" name="supplier_id">
+          <option value="">Seleccione...</option>
+          {% for supplier in suppliers %}
+            <option value="{{ supplier.id }}" {{ 'selected' if values.get('supplier_id')|string == supplier.id|string }}>
+              {{ supplier.name }} ({{ supplier.delivery_days }} días de entrega)</option>
+          {% endfor %}
+        </select>
+        {% if errors.get('supplier_id') %}<div class="invalid-feedback">{{ errors.supplier_id }}</div>{% endif %}
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="description">Descripción</label>
+        <textarea class="form-control {{ 'is-invalid' if errors.get('description') }}" id="description" name="description"
+                  rows="3" maxlength="300">{{ values.get('description', '') or '' }}</textarea>
+        {% if errors.get('description') %}<div class="invalid-feedback">{{ errors.description }}</div>{% endif %}
+      </div>
+    </div>
+    <div class="col-12 col-lg-6">
+      {{ field('price', 'Precio de venta (COP) *', values, errors, type='number', attrs='min="1" step="50" required') }}
+      {{ field('current_stock', 'Stock actual *' if editing else 'Stock inicial *', values, errors, type='number',
+               help='Si cambia el stock al editar, se registra un movimiento de ajuste.' if editing else 'Se registra como movimiento de entrada "Inventario inicial".',
+               attrs='min="0" step="1" required') }}
+      {{ field('minimum_stock', 'Stock mínimo *', values, errors, type='number',
+               help='Por debajo de este nivel se genera una alerta de stock bajo. También se usa como stock de seguridad.',
+               attrs='min="0" step="1" required') }}
+    </div>
+  </div>
+  <div class="ss-card-body border-top d-flex gap-2 justify-content-end">
+    <a class="btn btn-outline-secondary" href="{{ url_for('products.detail', product_id=product.id) if editing else url_for('products.list_products') }}">Cancelar</a>
+    <button class="btn btn-primary"><i class="bi bi-check-lg"></i> {{ 'Guardar cambios' if editing else 'Registrar producto' }}</button>
+  </div>
+</form>
+{% endblock %}

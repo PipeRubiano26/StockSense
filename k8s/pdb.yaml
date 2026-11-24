@@ -1,0 +1,11 @@
+# Durante mantenimientos voluntarios siempre queda al menos 1 réplica funcionando.
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: stocksense
+  namespace: stocksense
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: stocksense

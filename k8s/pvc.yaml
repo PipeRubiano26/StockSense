@@ -1,0 +1,39 @@
+# Almacenamiento persistente para la base SQLite: los datos sobreviven aunque los pods se caigan.
+#
+# SQLite es un archivo, así que todas las réplicas deben usar el MISMO disco. El volumen
+# vive en el nodo "minikube" (carpeta /data, que minikube conserva entre reinicios) y,
+# por su nodeAffinity, Kubernetes programa las réplicas en ese nodo.
+# En producción con varios servidores se usaría PostgreSQL y las réplicas podrían repartirse.
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: stocksense-data
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes: ["ReadWriteOnce"]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: stocksense-local
+  hostPath:
+    path: /data/stocksense
+    type: DirectoryOrCreate
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values: ["minikube"]
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: stocksense-data
+  namespace: stocksense
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: stocksense-local
+  volumeName: stocksense-data
+  resources:
+    requests:
+      storage: 1Gi

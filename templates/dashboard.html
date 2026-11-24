@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% from "_macros.html" import risk_badge %}
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block page_subtitle %}Resumen del inventario calculado en tiempo real desde la base de datos y el modelo{% endblock %}
+{% block page_actions %}
+  <a class="btn btn-outline-primary btn-sm" href="{{ url_for('sales.create') }}"><i class="bi bi-plus-lg"></i> Nueva venta</a>
+  <a class="btn btn-primary btn-sm" href="{{ url_for('predictions.index') }}"><i class="bi bi-graph-up-arrow"></i> Predecir</a>
+{% endblock %}
+
+{% block content %}
+<div class="row g-3 mb-3">
+  {% set cards = [
+    ('Productos', stats.total_products|number, 'bi-box', '', 'registrados en el inventario'),
+    ('Unidades disponibles', stats.total_units|number, 'bi-stack', 'success', 'valor: ' ~ (stats.inventory_value|money)),
+    ('Stock bajo', stats.low_stock|number, 'bi-arrow-down-circle', 'warning', 'stock ≤ mínimo definido'),
+    ('Alertas activas', stats.active_alerts|number, 'bi-bell', 'danger', 'recalculadas al cargar'),
+    ('Demanda estimada 7 días', stats.demand_7d|number if stats.demand_7d is not none else '—', 'bi-cpu', '', 'unidades · modelo de regresión'),
+  ] %}
+  {% for label, value, icon, tone, hint in cards %}
+  <div class="col-12 col-sm-6 col-xl">
+    <div class="ss-card ss-stat d-flex justify-content-between gap-2">
+      <div>
+        <div class="ss-stat-label">{{ label }}</div>
+        <div class="ss-stat-value">{{ value }}</div>
+        <div class="ss-stat-hint">{{ hint }}</div>
+      </div>
+      <div class="ss-stat-icon {{ tone }}"><i class="bi {{ icon }}"></i></div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+
+<div class="row g-3 mb-3">
+  <div class="col-12 col-xl-8">
+    <div class="ss-card h-100">
+      <div class="ss-card-header">
+        <h2 class="ss-card-title">Ventas diarias · últimos 90 días</h2>
+        <span class="text-secondary small">unidades vendidas</span>
+      </div>
+      <div class="ss-card-body"><div class="ss-chart"><canvas id="salesChart"></canvas></div></div>
+    </div>
+  </div>
+  <div class="col-12 col-xl-4">
+    <div class="ss-card h-100">
+      <div class="ss-card-header"><h2 class="ss-card-title">Riesgo de agotamiento</h2></div>
+      <div class="ss-card-body">
+        {% if model_available %}
+          <div class="ss-chart sm"><canvas id="riskChart"></canvas></div>
+        {% else %}<div class="ss-empty">Requiere el modelo entrenado.</div>{% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="row g-3">
+  <div class="col-12 col-xl-7">
+    <div class="ss-card h-100">
+      <div class="ss-card-header">
+        <h2 class="ss-card-title">Niveles de inventario</h2>
+        <span class="text-secondary small">stock actual vs. mínimo</span>
+      </div>
+      <div class="ss-card-body"><div class="ss-chart" style="height: 420px"><canvas id="inventoryChart"></canvas></div></div>
+    </div>
+  </div>
+  <div class="col-12 col-xl-5 d-flex flex-column gap-3">
+    <div class="ss-card">
+      <div class="ss-card-header">
+        <h2 class="ss-card-title">Próximos a agotarse</h2>
+        <a class="small" href="{{ url_for('alerts.index') }}">Ver alertas</a>
+      </div>
+      <div class="table-responsive">
+        <table class="table ss-table">
+          <thead><tr><th>Producto</th><th class="num">Stock</th><th class="num">Días</th><th>Riesgo</th></tr></thead>
+          <tbody>
+          {% for product, analysis in at_risk %}
+            <tr>
+              <td><a href="{{ url_for('predictions.index', product_id=product.id) }}">{{ product.name }}</a></td>
+              <td class="num">{{ product.current_stock|number }}</td>
+              <td class="num">{{ analysis.days_to_stockout if analysis.days_to_stockout is not none else '> ' ~ analysis.horizon_days }}</td>
+              <td>{{ risk_badge(analysis.risk) }}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="4" class="ss-empty">Sin datos de predicción.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="ss-card">
+      <div class="ss-card-header">
+        <h2 class="ss-card-title">Mayor rotación · 30 días</h2>
+      </div>
+      <div class="table-responsive">
+        <table class="table ss-table">
+          <thead><tr><th>#</th><th>Producto</th><th>Categoría</th><th class="num">Unidades</th></tr></thead>
+          <tbody>
+          {% for product, units in top_products %}
+            <tr><td>{{ loop.index }}</td><td>{{ product.name }}</td><td class="text-secondary">{{ product.category }}</td>
+                <td class="num fw-semibold">{{ units|number }}</td></tr>
+          {% else %}
+            <tr><td colspan="4" class="ss-empty">Sin ventas en los últimos 30 días.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+<script type="application/json" id="dashboardData">{{ charts|tojson }}</script>
+{% endblock %}
+
+{% block scripts %}<script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>{% endblock %}

@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Proveedores{% endblock %}
+{% block page_title %}Proveedores{% endblock %}
+{% block page_subtitle %}Tiempos de entrega usados para calcular el riesgo de agotamiento{% endblock %}
+{% block page_actions %}
+  <a class="btn btn-primary btn-sm" href="{{ url_for('suppliers.create') }}"><i class="bi bi-plus-lg"></i> Nuevo proveedor</a>
+{% endblock %}
+
+{% block content %}
+<div class="ss-card">
+  <div class="ss-card-body border-bottom">
+    <input class="form-control" placeholder="Buscar proveedor, contacto o correo..." data-table-search="#suppliersTable" aria-label="Buscar">
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover ss-table" id="suppliersTable">
+      <thead><tr><th>Proveedor</th><th>Contacto</th><th>Correo</th><th>Teléfono</th><th class="num">Entrega</th>
+        <th class="num">Productos</th><th class="num">Pedidos pendientes</th><th></th></tr></thead>
+      <tbody>
+      {% for supplier in suppliers %}
+        {% set pending = supplier.purchase_orders|selectattr('status', 'equalto', 'pendiente')|list %}
+        <tr data-row>
+          <td><a class="fw-semibold text-decoration-none" href="{{ url_for('suppliers.detail', supplier_id=supplier.id) }}">{{ supplier.name }}</a></td>
+          <td>{{ supplier.contact }}</td>
+          <td class="text-secondary">{{ supplier.email }}</td>
+          <td class="text-nowrap">{{ supplier.phone }}</td>
+          <td class="num fw-semibold">{{ supplier.delivery_days }} días</td>
+          <td class="num">{{ supplier.products|length }}</td>
+          <td class="num">
+            {{ pending|length }}
+            {% set delayed = pending|selectattr('is_delayed')|list %}
+            {% if delayed %}<span class="ss-badge risk-alto ms-1">{{ delayed|length }} retrasado(s)</span>{% endif %}
+          </td>
+          <td class="text-end"><a class="btn btn-sm btn-outline-secondary" href="{{ url_for('suppliers.edit', supplier_id=supplier.id) }}" title="Editar"><i class="bi bi-pencil"></i></a></td>
+        </tr>
+      {% else %}
+        <tr><td colspan="8" class="ss-empty">No hay proveedores registrados.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

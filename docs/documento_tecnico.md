@@ -106,9 +106,11 @@ Jupyter (offline) ──▶ data/synthetic_sales.csv ──▶ entrenamiento ─
 
 ## 3. Modelado arquitectónico C4
 
-Los diagramas están en `docs/diagrams/` en formato PlantUML con la biblioteca estándar C4-PlantUML (`!include <C4/...>`). La sección [README › Diagramas](../README.md#diagramas) explica cómo renderizarlos.
+Las fuentes de los diagramas están en `docs/diagrams/` (PlantUML con la biblioteca estándar C4-PlantUML) y las imágenes generadas en `docs/images/`.
 
 ### 3.1 Nivel 1 — Contexto (`c4_context.puml`)
+
+![Diagrama C4 de contexto](images/c4_context.png)
 
 Muestra el sistema StockSense como una caja negra con sus actores:
 
@@ -120,6 +122,8 @@ Muestra el sistema StockSense como una caja negra con sus actores:
 **Decisión clave:** el entrenamiento está fuera del sistema en ejecución. La aplicación no depende de Jupyter para funcionar, solo del archivo exportado.
 
 ### 3.2 Nivel 2 — Contenedores (`c4_containers.puml`)
+
+![Diagrama C4 de contenedores](images/c4_containers.png)
 
 | Contenedor | Tecnología | Responsabilidad |
 |---|---|---|
@@ -135,6 +139,8 @@ Es una **arquitectura monolítica en capas**, sin microservicios: el alcance del
 En Kubernetes, el contenedor *Backend Flask* se ejecuta como **2 réplicas idénticas** del mismo monolito (no son microservicios: cada réplica tiene todo el sistema). Ambas comparten la misma base SQLite en un volumen persistente. La vista de despliegue está en `deployment_k8s.puml` (sección 12).
 
 ### 3.3 Nivel 3 — Componentes del backend (`c4_components.puml`)
+
+![Diagrama C4 de componentes](images/c4_components.png)
 
 * **Rutas de gestión** (`dashboard`, `products`, `sales`, `suppliers`, `alerts`): reciben formularios, llaman a los servicios y renderizan plantillas. No contienen lógica de negocio.
 * **Rutas de inteligencia** (`predictions`, `scenarios`): exponen la API JSON (`/predictions/api/forecast`, `/predictions/api/predict`, `/scenarios/api/run`) y devuelven errores uniformes (400 validación, 404 inexistente, 503 sin modelo).
@@ -153,6 +159,8 @@ En Kubernetes, el contenedor *Backend Flask* se ejecuta como **2 réplicas idén
 
 ### 4.1 Diagrama de secuencia — inferencia (`sequence_inference.puml`)
 
+![Diagrama UML de secuencia](images/sequence_inference.png)
+
 Representa desde que el usuario pide una predicción hasta que recibe el resultado:
 
 1. **Al iniciar Flask**, `PredictionService` ejecuta `joblib.load()` una sola vez (sin entrenar).
@@ -166,6 +174,8 @@ Representa desde que el usuario pide una predicción hasta que recibe el resulta
 7. La respuesta JSON se muestra en indicadores, gráficos, la tabla de factores y la recomendación.
 
 ### 4.2 Diagrama de actividades — funcionamiento del sistema (`activity_system.puml`)
+
+![Diagrama UML de actividades](images/activity_system.png)
 
 Representa el flujo completo con sus decisiones:
 
@@ -287,6 +297,16 @@ Validación (6.55 / 11.75 / 0.822) y prueba (6.63 / 11.84 / 0.819) son casi igua
 | Baja | 3.8 | 2.29 | 60 % | −0.12 |
 
 El R² global es alto porque el modelo distingue bien productos de distinto nivel de ventas. **Dentro** de un mismo grupo el poder explicativo es menor. En los productos de baja rotación la variación diaria es casi pura aleatoriedad, y el modelo no supera al promedio del grupo. Esto se reporta tal cual; no se oculta.
+
+**Sobreajuste, subajuste y posibles errores**
+
+* **Sobreajuste:** no hay señales. Las métricas de validación (R² 0.822) y de prueba (R² 0.819) prácticamente coinciden, aunque el conjunto de prueba son meses posteriores a todo el entrenamiento. La regresión lineal tiene pocos parámetros respecto a las 28 711 filas de entrenamiento, y las pruebas automáticas con muestras nuevas (semillas 7, 123 y 999) dan R² entre 0.78 y 0.82.
+* **Subajuste:** sí lo hay, de forma parcial. El modelo es lineal y la demanda real tiene efectos multiplicativos (la promoción aumenta más las ventas de los productos que ya venden mucho). Las interacciones `discount_x_avg30` y `weekend_x_avg30` lo corrigen solo en parte: subieron el R² de validación de 0.784 a 0.822. En baja rotación el modelo no capta la variación diaria (R² −0.12).
+* **Posibles errores en uso:**
+    1. Subestimar la demanda en promociones de productos de alta rotación (es donde el RMSE es mayor).
+    2. Acumular error en horizontes largos, porque cada día pronosticado alimenta el siguiente.
+    3. Predecir demanda baja si el historial reciente tiene días sin ventas registradas. La aplicación muestra un aviso cuando el historial lleva 2 o más días sin ventas.
+    4. Predicciones poco confiables para productos nuevos, sin historial.
 
 **Pronóstico recursivo a 30 días (uso real en la aplicación).** Se pronosticaron 30 días de cada uno de los 50 productos desde el 01-sep-2025 con `ml/forecasting.py`, el mismo código que usa Flask, y se compararon las unidades totales:
 
@@ -425,6 +445,8 @@ Se ejecutan con `python -m pytest`. Usan SQLite en memoria (no tocan `stocksense
 **Requisito:** el sistema debe tolerar caídas y recuperarse automáticamente. Se cumple desplegando StockSense en un clúster **Kubernetes local (minikube)**, que corre en el mismo equipo sin servicios pagos.
 
 ### 12.1 Arquitectura de despliegue (`deployment_k8s.puml`)
+
+![Diagrama de despliegue en Kubernetes](images/deployment_k8s.png)
 
 ```
 Navegador ──▶ minikube service (túnel) ──▶ Service "stocksense" (NodePort 30500)

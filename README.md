@@ -74,7 +74,14 @@ StockSense/
 
 ## Instalación (Windows)
 
-Abra **PowerShell** en la carpeta del proyecto.
+Descargue el proyecto (requiere [Git](https://git-scm.com/download/win)) o use *Code › Download ZIP* en GitHub:
+
+```powershell
+git clone https://github.com/PipeRubiano26/StockSense.git
+cd StockSense
+```
+
+Luego, en **PowerShell** dentro de la carpeta del proyecto:
 
 ```powershell
 # 1. Crear el entorno virtual
